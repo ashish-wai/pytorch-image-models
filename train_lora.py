@@ -40,7 +40,7 @@ from timm.optim import create_optimizer_v2, optimizer_kwargs
 from timm.scheduler import create_scheduler_v2, scheduler_kwargs
 from timm.utils import ApexScaler, NativeScaler
 from peft import LoraConfig, get_peft_model
-
+from transformers import AutoModelForImageClassification
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, accuracy_score
 
 import warnings
@@ -418,6 +418,8 @@ group.add_argument('--log-wandb', action='store_true', default=False,
 group = parser.add_argument_group('LoRA parameters')
 group.add_argument('--lora', action='store_true', default=False,
                    help='Enable LoRA training')
+group.add_argument('--label2id', default=['aphids', 'none', 'whitefly'], type=str, nargs='+',
+                   help='LoRA label2id')
 group.add_argument('--lora-config', default=None, type=str, metavar='FILE',
                    help='LoRA configuration file')
 group.add_argument('--lora-r', type=int, default=16,
@@ -510,23 +512,35 @@ def main():
             file=args.pretrained_path,
             num_classes=-1,  # force head adaptation
         )
-
-    model = create_model(
-        args.model,
-        pretrained=args.pretrained,
-        in_chans=in_chans,
-        num_classes=args.num_classes,
-        drop_rate=args.drop,
-        drop_path_rate=args.drop_path,
-        drop_block_rate=args.drop_block,
-        global_pool=args.gp,
-        bn_momentum=args.bn_momentum,
-        bn_eps=args.bn_eps,
-        scriptable=args.torchscript,
-        checkpoint_path=args.initial_checkpoint,
-        **factory_kwargs,
-        **args.model_kwargs,
-    )
+    if args.lora:
+        label2idx = {label: idx for idx, label in enumerate(args.label2id)}
+        idx2label = {idx: label for idx, label in enumerate(args.label2id)}
+        print(label2idx)
+        model = AutoModelForImageClassification.from_pretrained(
+            args.model,
+            label2id=label2idx,
+            id2label=idx2label,
+            ignore_mismatched_sizes=True,
+        )
+        print_trainable_parameters(model)
+    else:
+        model = create_model(
+            args.model,
+            pretrained=args.pretrained,
+            in_chans=in_chans,
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            drop_block_rate=args.drop_block,
+            global_pool=args.gp,
+            bn_momentum=args.bn_momentum,
+            bn_eps=args.bn_eps,
+            scriptable=args.torchscript,
+            checkpoint_path=args.initial_checkpoint,
+            **factory_kwargs,
+            **args.model_kwargs,
+        )
+    # print(model)
     if args.head_init_scale is not None:
         with torch.no_grad():
             model.get_classifier().weight.mul_(args.head_init_scale)
@@ -686,9 +700,9 @@ def main():
 
         lora_config = LoraConfig(
             r=args.lora_r,
-            alpha=args.lora_alpha,
+            lora_alpha=args.lora_alpha,
             target_modules=args.lora_target_modules,
-            dropout=args.lora_dropout,
+            lora_dropout=args.lora_dropout,
             bias=args.lora_bias,
             modules_to_save=args.lora_modules_to_save
         )
@@ -1080,8 +1094,12 @@ def train_one_epoch(
 
         def _forward():
             with amp_autocast():
-                output = model(input)
-                loss = loss_fn(output, target)
+                if args.lora:
+                    output = model(input).logits
+                    loss = loss_fn(output, target)
+                else:
+                    output = model(input)
+                    loss = loss_fn(output, target)
             if accum_steps > 1:
                 loss /= accum_steps
             return loss
@@ -1212,7 +1230,10 @@ def validate(
                 input = input.contiguous(memory_format=torch.channels_last)
 
             with amp_autocast():
-                output = model(input)
+                if args.lora:
+                    output = model(input).logits
+                else:
+                    output = model(input)
                 if isinstance(output, (tuple, list)):
                     output = output[0]
 

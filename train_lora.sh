@@ -5,11 +5,11 @@ dataset_path="/bucket/npss/CottonPestClassification_v3a_npss/"
 train_split="train"
 img_size=224
 val_split="val"
-model_name="vit_small_patch32_224.augreg_in21k_ft_in1k"
+model_name="google/vit-base-patch16-224-in21k"
 use_pretrained=true  # set to true or false
-# output_path="/bucket/weights"
+output_path="/bucket/experiments_ashish"
 name="NPSS_Cotton"
-experiment_name="ViT_Trials"
+experiment_name="ViT_LoRA_Trials"
 use_wandb=true      # set to true or false
 device="cuda"  # can be "cpu" or "cuda" (if GPU available) default is "cuda"
 data_path="/bucket/npss/CottonPestClassification_v3a_npss/"
@@ -21,16 +21,16 @@ num_classes=3
 mapping="Cotton_ClassMap.txt"
 # validation_batch_size=None
 ## LORA Params
-
+lora=true
 lora_r=16
 lora_alpha=16
 lora_dropout=0.1
 lora_bias="none"
-lora_modules_to_save=("classifier")
-target_modules=("query value" "query value")
+lora_modules_to_save="classifier"
+target_modules="query value"
 
 # Construct the command with variables
-command="python train.py"
+command="python train_lora.py"
 command+=" --train-split $train_split"
 command+=" --val-split $val_split"
 command+=" --model $model_name"
@@ -54,17 +54,20 @@ command+=" --img-size $img_size"
 command+=" --name $name"
 
 # LORA Params
-command+=" --lora"
-command+=" --lora_r $lora_r"
-command+=" --lora_alpha $lora_alpha"
-command+=" --lora_dropout $lora_dropout"
-command+=" --lora_bias $lora_bias"
-command+=" --lora_modules_to_save ${lora_modules_to_save[@]}"
-command+=" --target_modules ${target_modules[@]}"
+if [ $lora == true ]; then
+  command+=" --lora"
+fi
+command+=" --lora-r $lora_r"
+command+=" --lora-alpha $lora_alpha"
+command+=" --lora-dropout $lora_dropout"
+command+=" --lora-bias $lora_bias"
+command+=" --lora-modules-to-save $lora_modules_to_save"
+command+=" --lora-target-modules $target_modules"
 
 # Print the constructed command for verification (optional)
-echo "Running command:"
+echo "Running command: $(date)"
 echo "$command"
+echo "===================="
 
 # Run the command
 eval "$command"
