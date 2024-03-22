@@ -27,7 +27,8 @@ from timm.layers import apply_test_time_pool, set_fast_norm
 from timm.models import create_model, load_checkpoint, is_model, list_models
 from timm.utils import accuracy, AverageMeter, natural_key, setup_default_logging, set_jit_fuser, \
     decay_batch_step, check_batch_size_retry, ParseKwargs, reparameterize_model
-
+from sklearn.metrics import precision_score, recall_score, f1_score
+import pandas as pd
 try:
     from apex import amp
     has_apex = True
@@ -311,6 +312,11 @@ def validate(args):
     top1 = AverageMeter()
     top5 = AverageMeter()
 
+    gt = []
+    pred = []
+    path_list = []
+    probs = []
+
     model.eval()
     with torch.no_grad():
         # warmup, reduce variability of first batch time, especially for comparing torchscript vs non
@@ -321,7 +327,7 @@ def validate(args):
             model(input)
 
         end = time.time()
-        for batch_idx, (input, target) in enumerate(loader):
+        for batch_idx, (input, target, path) in enumerate(loader):
             if args.no_prefetcher:
                 target = target.to(device)
                 input = input.to(device)
@@ -349,6 +355,11 @@ def validate(args):
             batch_time.update(time.time() - end)
             end = time.time()
 
+            gt += target.cpu().numpy().tolist()
+            pred += output.argmax(1).cpu().numpy().tolist()
+            path_list += [p for p in path]
+            probs += output.cpu().numpy().tolist()
+
             if batch_idx % args.log_freq == 0:
                 _logger.info(
                     'Test: [{0:>4d}/{1}]  '
@@ -366,6 +377,9 @@ def validate(args):
                     )
                 )
 
+    precision = precision_score(gt, pred, average=None)
+    recall = recall_score(gt, pred, average=None)
+    f1 = f1_score(gt, pred, average=None)
     if real_labels is not None:
         # real labels mode replaces topk values at the end
         top1a, top5a = real_labels.get_accuracy(k=1), real_labels.get_accuracy(k=5)
@@ -380,7 +394,12 @@ def validate(args):
         crop_pct=crop_pct,
         interpolation=data_config['interpolation'],
     )
-
+    for idx, (p, r, f) in enumerate(zip(precision, recall, f1)):
+        results[f'precision_{idx}'] = round(p, 4)
+        results[f'recall_{idx}'] = round(r, 4)
+        results[f'f1_{idx}'] = round(f, 4)
+    logs_df = pd.DataFrame({'path': path_list, 'gt': gt, 'pred': pred, 'probs': probs})
+    logs_df.to_csv(args.results_file.replace('.csv', '_logs.csv'), index=False)
     _logger.info(' * Acc@1 {:.3f} ({:.3f}) Acc@5 {:.3f} ({:.3f})'.format(
        results['top1'], results['top1_err'], results['top5'], results['top5_err']))
 

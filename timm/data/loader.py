@@ -124,7 +124,7 @@ class PrefetchLoader:
             stream = None
             stream_context = suppress
 
-        for next_input, next_target in self.loader:
+        for next_input, next_target, next_path in self.loader:
 
             with stream_context():
                 next_input = next_input.to(device=self.device, non_blocking=True)
@@ -143,8 +143,9 @@ class PrefetchLoader:
 
             input = next_input
             target = next_target
+            path = next_path
 
-        yield input, target
+        yield input, target, path
 
     def __len__(self):
         return len(self.loader)
@@ -387,7 +388,6 @@ class MultiEpochsDataLoader(torch.utils.data.DataLoader):
             yield next(self.iterator)
 
 
-class _RepeatSampler(object):
     """ Sampler that repeats forever.
 
     Args:

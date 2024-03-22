@@ -14,6 +14,9 @@ from .readers import create_reader
 
 _logger = logging.getLogger(__name__)
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
 
 _ERROR_RETRY = 50
 
@@ -46,8 +49,7 @@ class ImageDataset(data.Dataset):
         self._consecutive_errors = 0
 
     def __getitem__(self, index):
-        img, target = self.reader[index]
-
+        img, target, path = self.reader[index]
         try:
             img = img.read() if self.load_bytes else Image.open(img)
         except Exception as e:
@@ -69,7 +71,7 @@ class ImageDataset(data.Dataset):
         elif self.target_transform is not None:
             target = self.target_transform(target)
 
-        return img, target
+        return img, target, path
 
     def __len__(self):
         return len(self.reader)
@@ -127,12 +129,12 @@ class IterableImageDataset(data.IterableDataset):
         self._consecutive_errors = 0
 
     def __iter__(self):
-        for img, target in self.reader:
+        for img, target, path in self.reader:
             if self.transform is not None:
                 img = self.transform(img)
             if self.target_transform is not None:
                 target = self.target_transform(target)
-            yield img, target
+            yield img, target, path
 
     def __len__(self):
         if hasattr(self.reader, '__len__'):

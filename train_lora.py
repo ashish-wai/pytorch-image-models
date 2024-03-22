@@ -39,6 +39,7 @@ from timm.models import create_model, safe_model_name, resume_checkpoint, load_c
 from timm.optim import create_optimizer_v2, optimizer_kwargs
 from timm.scheduler import create_scheduler_v2, scheduler_kwargs
 from timm.utils import ApexScaler, NativeScaler
+from peft import LoraConfig, get_peft_model
 
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, accuracy_score
 
@@ -76,6 +77,20 @@ has_compile = hasattr(torch, 'compile')
 
 
 _logger = logging.getLogger('train')
+
+def print_trainable_parameters(model):
+    """
+    Prints the number of trainable parameters in the model.
+    """
+    trainable_params = 0
+    all_param = 0
+    for _, param in model.named_parameters():
+        all_param += param.numel()
+        if param.requires_grad:
+            trainable_params += param.numel()
+    print(
+        f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param:.2f}"
+    )
 
 # The first arg parser parses out only the --config argument, this argument is used to
 # load a yaml file containing key-values that override the defaults for the main parser below
@@ -399,6 +414,26 @@ group.add_argument('--use-multi-epochs-loader', action='store_true', default=Fal
 group.add_argument('--log-wandb', action='store_true', default=False,
                    help='log training and validation metrics to wandb')
 
+# LoRA parameters
+group = parser.add_argument_group('LoRA parameters')
+group.add_argument('--lora', action='store_true', default=False,
+                   help='Enable LoRA training')
+group.add_argument('--lora-config', default=None, type=str, metavar='FILE',
+                   help='LoRA configuration file')
+group.add_argument('--lora-r', type=int, default=16,
+                   help='LoRA r parameter')
+group.add_argument('--lora-alpha', type=int, default=16,
+                     help='LoRA alpha parameter')
+group.add_argument('--lora-target-modules', default=["query", "value"], type=str, nargs='+',
+                        help='LoRA target modules')
+group.add_argument('--lora-dropout', type=float, default=0.1,
+                        help='LoRA dropout')
+group.add_argument('--lora-bias', type=str, default="none",
+                        help='LoRA bias')
+group.add_argument('--lora-modules-to-save', default=["classifier"], type=str, nargs='+',
+                        help='LoRA modules to save')
+
+
 
 def _parse_args():
     # Do we have a config file to parse?
@@ -637,6 +672,30 @@ def main():
         # torch compile should be done after DDP
         assert has_compile, 'A version of torch w/ torch.compile() is required for --compile, possibly a nightly.'
         model = torch.compile(model, backend=args.torchcompile)
+    
+    if args.lora:
+        if args.lora_config:
+            with open(args.lora_config, 'r') as f:
+                lora_user_config = yaml.safe_load(f)
+            args.lora_r = lora_user_config['r']
+            args.lora_alpha = lora_user_config['alpha']
+            args.lora_target_modules = lora_user_config['target_modules']
+            args.lora_dropout = lora_user_config['dropout']
+            args.lora_bias = lora_user_config['bias']
+            args.lora_modules_to_save = lora_user_config['modules_to_save']
+
+        lora_config = LoraConfig(
+            r=args.lora_r,
+            alpha=args.lora_alpha,
+            target_modules=args.lora_target_modules,
+            dropout=args.lora_dropout,
+            bias=args.lora_bias,
+            modules_to_save=args.lora_modules_to_save
+        )
+        lora_model = get_peft_model(model, lora_config)
+        # overwrite model with lora_model
+        model = lora_model
+        print_trainable_parameters(model=model)
 
     # create the train and eval datasets
     if args.data and not args.data_dir:

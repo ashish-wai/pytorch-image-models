@@ -85,7 +85,7 @@ class ReaderImageFolder(Reader):
 
     def __getitem__(self, index):
         path, target = self.samples[index]
-        return open(path, 'rb'), target
+        return open(path, 'rb'), target, path
 
     def __len__(self):
         return len(self.samples)
