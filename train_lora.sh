@@ -9,12 +9,12 @@ model_name="google/vit-base-patch16-224-in21k"
 use_pretrained=true  # set to true or false
 output_path="/bucket/experiments_ashish"
 name="NPSS_Cotton"
-experiment_name="ViT_LoRA_Trials"
+experiment_name="ViT_LoRA_LR_1000epch"
 use_wandb=true      # set to true or false
 device="cuda"  # can be "cpu" or "cuda" (if GPU available) default is "cuda"
 data_path="/bucket/npss/CottonPestClassification_v3a_npss/"
 batch_size=128
-epochs=300  
+epochs=1000  
 mean=(0.485 0.456 0.406) # ImageNet mean
 std=(0.229 0.224 0.225) # ImageNet std
 num_classes=3
@@ -31,6 +31,7 @@ target_modules="query value"
 
 # Construct the command with variables
 command="python train_lora.py"
+command+=" --lr 5e-3"
 command+=" --train-split $train_split"
 command+=" --val-split $val_split"
 command+=" --model $model_name"
