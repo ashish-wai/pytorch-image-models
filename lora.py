@@ -20,6 +20,10 @@ import json
 import numpy as np
 import yaml
 import torch
+import evaluate
+
+
+metric = evaluate.load("accuracy")
 
 def get_config(config_path=None):
     if config_path is not None:
@@ -107,9 +111,7 @@ def create_model(config, label2id, id2label):
 
 def compute_metrics(eval_pred):
     predictions = np.argmax(eval_pred.predictions, axis=1)
-    metric = load("accuracy")
-    accuracy = metric.compute(predictions=predictions, references=eval_pred.label_ids)
-    return accuracy 
+    return metric.compute(predictions=predictions, references=eval_pred.label_ids)
 
 
 def collate_fn(examples):
@@ -156,6 +158,7 @@ def main(config_path=None):
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
+        tokenizer=AutoImageProcessor.from_pretrained(config["model_checkpoint"]),
         data_collator=collate_fn,
         compute_metrics=compute_metrics,
     )
