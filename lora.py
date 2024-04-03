@@ -108,6 +108,7 @@ def create_model(config, label2id, id2label):
 
     return model
 
+metric = evaluate.load("accuracy")
 
 def compute_metrics(eval_pred):
     predictions = np.argmax(eval_pred.predictions, axis=1)
@@ -125,15 +126,15 @@ def main(config_path=None):
 
     # Load data
     train_transforms, val_transforms = create_transforms(config["height"], config["width"])
-    train_dataset = load_data(config["data_dir"], "train", train_transforms)
-    val_dataset = load_data(config["data_dir"], "val", val_transforms)
+    train_dataset = load_data(config["data_dir"], "train")
+    val_dataset = load_data(config["data_dir"], "val")
 
     # Create model
     model = create_model(config, train_dataset.labels2id, train_dataset.id2label)
 
     # Define training arguments
     training_args = TrainingArguments(
-        f"{config['username']}/{config['repository_name']}",
+        f"{config['output_dir']}/{config['experiment']}/{config['run']}",
         remove_unused_columns=False,
         evaluation_strategy="epoch",
         save_strategy="epoch",
@@ -148,7 +149,7 @@ def main(config_path=None):
         metric_for_best_model="accuracy",
         push_to_hub=config["push_to_hub"],
         label_names=list(train_dataset.id2label.values()),
-        run_name=config["run"],
+        
     )
 
     # Define trainer instance
@@ -159,17 +160,16 @@ def main(config_path=None):
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         tokenizer=AutoImageProcessor.from_pretrained(config["model_checkpoint"]),
-        data_collator=collate_fn,
         compute_metrics=compute_metrics,
+        data_collator=collate_fn,
     )
 
     # save config and model
-    with open(f"{training_args.output_dir}/config.json", "w") as f:
-        json.dump(config, f, indent=4)
+    # with open(f"{training_args.output_dir}/config.json", "w") as f:
+    #     json.dump(config, f, indent=4)
     
 
     train_result = trainer.train()
-    # metrics = trainer.evaluate()
 
     print("Train result:", train_result)
 

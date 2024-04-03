@@ -1,7 +1,7 @@
 *.txt
 *.csv
 wandb/
-
+vit-base-patch16-224-in21k-finetuned-lora-food101/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

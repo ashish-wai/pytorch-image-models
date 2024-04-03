@@ -2,7 +2,7 @@ model_checkpoint="google/vit-base-patch16-224"
 data_dir="/bucket/npss/CottonPestClassification_v3a_npss/"
 batch_size=128
 learning_rate=2e-5
-num_train_epochs=300
+num_train_epochs=100
 fp16=true
 output_dir="/bucket/experiments_ashish"
 
