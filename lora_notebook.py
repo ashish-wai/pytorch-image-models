@@ -117,7 +117,7 @@ args = TrainingArguments(
     label_names=["labels"],
     dataloader_num_workers=4,
     dataloader_prefetch_factor=1,
-    save_total_limit=100,
+    save_total_limit=10,
     save_strategy="epoch",
     evaluation_strategy="epoch",
     run_name=f"{model_name}-lora-os100_corrected",
@@ -156,3 +156,6 @@ trainer = Trainer(
     data_collator=collate_fn,
 )
 train_results = trainer.train()
+
+# save best model
+trainer.save_model(f"output/{model_name}-lora-os100_new_best") 

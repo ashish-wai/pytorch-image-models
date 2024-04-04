@@ -24,8 +24,10 @@ from torchvision.transforms import (
     ToTensor,
 )
 
-ImageNet_mean = [0.5, 0.5, 0.5] 
-ImageNet_std = [0.5, 0.5, 0.5] 
+# ImageNet_mean = [0.5, 0.5, 0.5] 
+# ImageNet_std = [0.5, 0.5, 0.5] 
+ImageNet_mean = [0.485, 0.456, 0.406]
+ImageNet_std = [0.229, 0.224, 0.225]
 normalize = Normalize(mean=ImageNet_mean, std=ImageNet_std)
 train_transforms = Compose(
     [
@@ -44,19 +46,6 @@ val_transforms = Compose(
         normalize,
     ]
 )
-
-
-def preprocess_train(example_batch):
-    """Apply train_transforms across a batch."""
-    example_batch["pixel_values"] = [train_transforms(image.convert("RGB")) for image in example_batch["image"]]
-    return example_batch
-
-
-def preprocess_val(example_batch):
-    """Apply val_transforms across a batch."""
-    example_batch["pixel_values"] = [val_transforms(image.convert("RGB")) for image in example_batch["image"]]
-    return example_batch
-
 
 from loaders.ImageData import ImageDataset
 data_dir = "/bucket/npss/CottonPestClassification_v3a_os_lora/"
@@ -97,14 +86,14 @@ model_name = model_checkpoint.split("/")[-1]
 batch_size = 128
 
 args = TrainingArguments(
-    f"output/{model_name.split('/')[-1]}-finetune-os100_final",
+    f"output/vit-finetune-os300_norm",
     remove_unused_columns=False,
     learning_rate=5e-3,
     per_device_train_batch_size=batch_size,
     gradient_accumulation_steps=4,
     per_device_eval_batch_size=batch_size,
     fp16=True,
-    num_train_epochs=50,
+    num_train_epochs=100,
     logging_steps=10,
     load_best_model_at_end=True,
     metric_for_best_model="accuracy",
@@ -112,10 +101,10 @@ args = TrainingArguments(
     label_names=["labels"],
     dataloader_num_workers=4,
     dataloader_prefetch_factor=1,
-    save_total_limit=100,
+    save_total_limit=10,
     save_strategy="epoch",
     evaluation_strategy="epoch",
-    run_name=f"{model_name}-finetune-os100_final",
+    run_name=f"vit-finetune-os300_norm",
     save_safetensors=False,
 )
 
@@ -139,6 +128,9 @@ def collate_fn(examples):
     labels = torch.tensor([example["labels"] for example in examples])
     return {"pixel_values": pixel_values, "labels": labels}
 
+from transformers import AutoImageProcessor
+
+image_processor = AutoImageProcessor.from_pretrained(model_checkpoint)
 
 trainer = Trainer(
     model,
@@ -147,5 +139,9 @@ trainer = Trainer(
     eval_dataset=val_loader,
     compute_metrics=compute_metrics,
     data_collator=collate_fn,
+    tokenizer=image_processor,
 )
 train_results = trainer.train()
+
+print_trainable_parameters(model)
+trainer.save_model(f"output/{model_name}-vit-finetune-os300_norm")
