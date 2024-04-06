@@ -1,20 +1,21 @@
 #!/bin/bash
 
 # Define variables with desired values (modify as needed)
-dataset_path="/bucket/npss/CottonPestClassification_v3a_npss/"
-train_split="train"
+dataset_path="/bucket/npss/CottonPestClassification_v3a_os_lora/"
+train_split="npss"
 img_size=224
 val_split="val"
-model_name="google/vit-base-patch16-224-in21k"
+model_name="vit_base_patch16_224.orig_in21k"
 use_pretrained=true  # set to true or false
 output_path="/bucket/experiments_ashish"
 name="NPSS_Cotton"
-experiment_name="ViT_LoRA_LR_1000epch"
+experiment_name="vit_base_patch16_224.orig_in21k-timm-050524-LORA-cotton"
+resume="output/train/vit_base_patch16_224.orig_in21k-timm-050524-OS/model_best.pth.tar"
 use_wandb=true      # set to true or false
 device="cuda"  # can be "cpu" or "cuda" (if GPU available) default is "cuda"
-data_path="/bucket/npss/CottonPestClassification_v3a_npss/"
-batch_size=128
-epochs=1000  
+data_path="/bucket/npss/CottonPestClassification_v3a_os_lora/"
+batch_size=32
+epochs=100  
 mean=(0.485 0.456 0.406) # ImageNet mean
 std=(0.229 0.224 0.225) # ImageNet std
 num_classes=3
@@ -27,7 +28,7 @@ lora_alpha=16
 lora_dropout=0.1
 lora_bias="none"
 lora_modules_to_save="classifier"
-target_modules="query value"
+target_modules="qkv"
 
 # Construct the command with variables
 command="python train_lora.py"
@@ -43,6 +44,7 @@ command+=" --experiment $experiment_name"
 if [ $use_wandb == true ]; then
   command+=" --log-wandb"
 fi
+command+=" --resume $resume"
 command+=" --device $device"
 command+=" --data-dir $data_path"
 command+=" --batch-size $batch_size"

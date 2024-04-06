@@ -12,7 +12,18 @@ print(f"Transformers version: {transformers.__version__}")
 print(f"Accelerate version: {accelerate.__version__}")
 print(f"PEFT version: {peft.__version__}")
 
-model_checkpoint = "google/vit-base-patch16-224"
+import random, torch
+import numpy as np
+
+def seed_everything(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+seed = 42
+seed_everything(seed)
+
+model_checkpoint = "google/vit-base-patch16-224-in21k"
 
 from torchvision.transforms import (
     CenterCrop,
@@ -69,7 +80,7 @@ def print_trainable_parameters(model):
     )
 
 
-from transformers import AutoModelForImageClassification, TrainingArguments, Trainer
+from transformers import AutoModelForImageClassification, TrainingArguments, Trainer, ViTForImageClassification
 
 model = AutoModelForImageClassification.from_pretrained(
     model_checkpoint,
@@ -77,6 +88,13 @@ model = AutoModelForImageClassification.from_pretrained(
     id2label=id2label,
     ignore_mismatched_sizes=True,  # provide this in case you're planning to fine-tune an already fine-tuned checkpoint
 )
+  
+# model = ViTForImageClassification.from_pretrained(
+#                     model_checkpoint,
+#                     label2id=label2id,
+#                     id2label=id2label,
+#                     num_labels=len(label2id),
+#                 )
 
 
 from transformers import TrainingArguments, Trainer
@@ -86,14 +104,14 @@ model_name = model_checkpoint.split("/")[-1]
 batch_size = 128
 
 args = TrainingArguments(
-    f"output/vit-finetune-os300_norm",
+    f"output/{model_name.split('/')[-1]}-finetune-os-lr_new",
     remove_unused_columns=False,
-    learning_rate=5e-3,
+    learning_rate=0.05,
     per_device_train_batch_size=batch_size,
     gradient_accumulation_steps=4,
     per_device_eval_batch_size=batch_size,
-    fp16=True,
-    num_train_epochs=100,
+    # fp16=True,
+    num_train_epochs=250,
     logging_steps=10,
     load_best_model_at_end=True,
     metric_for_best_model="accuracy",
@@ -103,9 +121,10 @@ args = TrainingArguments(
     dataloader_prefetch_factor=1,
     save_total_limit=10,
     save_strategy="epoch",
+    # warmup_steps=5,
     evaluation_strategy="epoch",
-    run_name=f"vit-finetune-os300_norm",
-    save_safetensors=False,
+    run_name=f"{model_name.split('/')[-1]}-finetune-os-lr_new",
+    # save_safetensors=False,
 )
 
 
@@ -144,4 +163,4 @@ trainer = Trainer(
 train_results = trainer.train()
 
 print_trainable_parameters(model)
-trainer.save_model(f"output/{model_name}-vit-finetune-os300_norm")
+trainer.save_model(f"output/{model_name.split('/')[-1]}-finetune-os-lr_new")

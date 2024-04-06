@@ -2,7 +2,7 @@
 import transformers
 import accelerate
 import peft
-import datetime
+import datetime, torch
 import warnings
 warnings.filterwarnings("ignore")
 project_name = "NPSS_Cotton"
@@ -11,7 +11,8 @@ os.environ["WANDB_PROJECT"] = project_name
 print(f"Transformers version: {transformers.__version__}")
 print(f"Accelerate version: {accelerate.__version__}")
 print(f"PEFT version: {peft.__version__}")
-
+from timm.models import create_model, load_checkpoint
+import timm
 
 # model_checkpoint = "ashishp-wiai/vit-base-patch16-224-in21k-finetuned-CottonPestClassification_v3a_os"
 # model_checkpoint = "ashishp-wiai/vit-base-patch16-224-in21k-finetuned-os300"
@@ -73,14 +74,22 @@ def print_trainable_parameters(model):
     )
 
 
-from transformers import AutoModelForImageClassification, TrainingArguments, Trainer
+# from transformers import AutoModelForImageClassification, TrainingArguments, Trainer
 
-model = AutoModelForImageClassification.from_pretrained(
-    model_checkpoint,
-    label2id=label2id,
-    id2label=id2label,
-    ignore_mismatched_sizes=True,  # provide this in case you're planning to fine-tune an already fine-tuned checkpoint
-)
+# model = AutoModelForImageClassification.from_pretrained(
+#     model_checkpoint,
+#     label2id=label2id,
+#     id2label=id2label,
+#     ignore_mismatched_sizes=True,  # provide this in case you're planning to fine-tune an already fine-tuned checkpoint
+# )
+
+base_model_path = "output/train/vit_base_patch16_224.orig_in21k-timm-050524-OS/model_best.pth.tar"
+
+model = timm.create_model('vit_base_patch16_224.orig_in21k', 
+                                pretrained=True, num_classes=3)
+load_checkpoint(model, base_model_path, strict=False)
+
+# print(model)
 print_trainable_parameters(model)
 
 
@@ -89,7 +98,7 @@ from peft import LoraConfig, get_peft_model
 config = LoraConfig(
     r=16,
     lora_alpha=16,
-    target_modules=["query", "value"],
+    target_modules=["qkv"],
     lora_dropout=0.1,
     bias="none",
     modules_to_save=["classifier"],
@@ -102,7 +111,7 @@ from transformers import TrainingArguments, Trainer
 model_name = model_checkpoint.split("/")[-1]
 batch_size = 128
 args = TrainingArguments(
-    f"output/{model_name.split('/')[-1]}-lora-os100_new",
+    f"output/{model_name.split('/')[-1]}-lora-os100_all",
     remove_unused_columns=False,
     learning_rate=5e-3,
     per_device_train_batch_size=batch_size,
@@ -120,8 +129,9 @@ args = TrainingArguments(
     save_total_limit=10,
     save_strategy="epoch",
     evaluation_strategy="epoch",
-    run_name=f"{model_name}-lora-os100_corrected",
+    run_name=f"{model_name}-lora-os100_corrected_saveAll",
     save_safetensors=False,
+    hub_strategy="all_checkpoints"
 )
 
 
@@ -137,18 +147,17 @@ def compute_metrics(eval_pred):
     return metric.compute(predictions=predictions, references=eval_pred.label_ids)
 
 
-import torch
-
-
 def collate_fn(examples):
     pixel_values = torch.stack([example["image"] for example in examples])
     labels = torch.tensor([example["labels"] for example in examples])
+    # return {"pixel_values": pixel_values, "labels": labels}
+    # return pixel_values, labels
     return {"pixel_values": pixel_values, "labels": labels}
 
 
 trainer = Trainer(
     lora_model,
-    model,
+    # model,
     args,
     train_dataset=train_loader,
     eval_dataset=val_loader,
@@ -158,4 +167,4 @@ trainer = Trainer(
 train_results = trainer.train()
 
 # save best model
-trainer.save_model(f"output/{model_name}-lora-os100_new_best") 
+# trainer.save_model(f"output/{model_name}-lora-os100_all_best") 

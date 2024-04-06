@@ -136,7 +136,6 @@ def download_from_hf(model_id: str, filename: str):
 def load_model_config_from_hf(model_id: str):
     assert has_hf_hub(True)
     cached_file = download_from_hf(model_id, 'config.json')
-
     hf_config = load_cfg_from_json(cached_file)
     if 'pretrained_cfg' not in hf_config:
         # old form, pull pretrain_cfg out of the base dict

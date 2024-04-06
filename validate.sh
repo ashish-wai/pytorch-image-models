@@ -2,10 +2,10 @@
 
 # Define variables with desired values (modify as needed)
 data_dir="/bucket/npss/CottonPestClassification_v3a_npss/"
-split="val"
-checkpoint="output/train/ViT_Trials/model_best.pth.tar"
-results_file="results/ViT_2003_v3a_npss_reporting_summary.csv"
-model_name="vit_small_patch32_224.augreg_in21k_ft_in1k"
+split="holdout"
+checkpoint="output/train/vit_base_patch16_224.orig_in21k-timm-050524-OS/model_best.pth.tar"
+results_file="results/vit_base_patch16_224.orig_in21k-timm-050524-OS_holdout_summary.csv"
+model_name="vit_base_patch16_224.orig_in21k"
 img_size=224
 num_classes=3
 mean=(0.485 0.456 0.406)  # List for mean values

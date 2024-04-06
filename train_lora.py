@@ -513,19 +513,19 @@ def main():
             file=args.pretrained_path,
             num_classes=-1,  # force head adaptation
         )
-    if args.lora:
-        label2idx = {label: idx for idx, label in enumerate(args.label2id)}
-        idx2label = {idx: label for idx, label in enumerate(args.label2id)}
-        print(label2idx)
-        model = AutoModelForImageClassification.from_pretrained(
-            args.model,
-            label2id=label2idx,
-            id2label=idx2label,
-            ignore_mismatched_sizes=True,
-        )
-        print_trainable_parameters(model)
-    else:
-        model = create_model(
+    # if args.lora:
+    #     label2idx = {label: idx for idx, label in enumerate(args.label2id)}
+    #     idx2label = {idx: label for idx, label in enumerate(args.label2id)}
+    #     print(label2idx)
+    #     model = AutoModelForImageClassification.from_pretrained(
+    #         args.model,
+    #         label2id=label2idx,
+    #         id2label=idx2label,
+    #         ignore_mismatched_sizes=True,
+    #     )
+    #     print_trainable_parameters(model)
+    # else:
+    model = create_model(
             args.model,
             pretrained=args.pretrained,
             in_chans=in_chans,
@@ -689,6 +689,7 @@ def main():
         model = torch.compile(model, backend=args.torchcompile)
     
     if args.lora:
+        load_checkpoint(model, args.resume, strict=False)
         if args.lora_config:
             with open(args.lora_config, 'r') as f:
                 lora_user_config = yaml.safe_load(f)
@@ -710,7 +711,9 @@ def main():
         lora_model = get_peft_model(model, lora_config)
         # overwrite model with lora_model
         model = lora_model
+        print(model)
         print_trainable_parameters(model=model)
+        # return 0
 
     # create the train and eval datasets
     if args.data and not args.data_dir:
@@ -814,6 +817,8 @@ def main():
         use_multi_epochs_loader=args.use_multi_epochs_loader,
         worker_seeding=args.worker_seeding,
     )
+    # print(len(loader_train))
+    # return
 
     loader_eval = None
     if args.val_split:
@@ -919,6 +924,8 @@ def main():
         start_epoch = args.start_epoch
     elif resume_epoch is not None:
         start_epoch = resume_epoch
+        if args.lora:
+            start_epoch = 0
     if lr_scheduler is not None and start_epoch > 0:
         if args.sched_on_updates:
             lr_scheduler.step_update(start_epoch * updates_per_epoch)
@@ -965,7 +972,6 @@ def main():
                     mapping = json.load(f)
             else:
                 mapping = {str(i): i for i in range(args.num_classes)}
-
             if loader_eval is not None:
                 eval_metrics = validate(
                     model,
@@ -1077,6 +1083,7 @@ def train_one_epoch(
     optimizer.zero_grad()
     update_sample_count = 0
     for batch_idx, (input, target) in enumerate(loader):
+        # print(input.size(), target)
         last_batch = batch_idx == last_batch_idx
         need_update = last_batch or (batch_idx + 1) % accum_steps == 0
         update_idx = batch_idx // accum_steps
@@ -1096,7 +1103,8 @@ def train_one_epoch(
         def _forward():
             with amp_autocast():
                 if args.lora:
-                    output = model(input).logits
+                    # output = model(input).logits
+                    output = model(input)
                     loss = loss_fn(output, target)
                 else:
                     output = model(input)
@@ -1232,7 +1240,8 @@ def validate(
 
             with amp_autocast():
                 if args.lora:
-                    output = model(input).logits
+                    # output = model(input).logits
+                    output = model(input)
                 else:
                     output = model(input)
                 if isinstance(output, (tuple, list)):
