@@ -9,8 +9,8 @@ model_name="vit_base_patch16_224.orig_in21k"
 use_pretrained=true  # set to true or false
 output_path="/bucket/experiments_ashish"
 name="NPSS_Cotton"
-experiment_name="vit_base_patch16_224.orig_in21k-timm-050524-LORA-cotton"
-resume="output/train/vit_base_patch16_224.orig_in21k-timm-050524-OS/model_best.pth.tar"
+experiment_name="vit_base_patch16_224.orig_in21k-timm-100424-NPSS"
+# resume="output/train/vit_base_patch16_224.orig_in21k-timm-050524-OS/model_best.pth.tar"
 use_wandb=true      # set to true or false
 device="cuda"  # can be "cpu" or "cuda" (if GPU available) default is "cuda"
 data_path="/bucket/npss/CottonPestClassification_v3a_os_lora/"
@@ -29,10 +29,13 @@ lora_dropout=0.1
 lora_bias="none"
 lora_modules_to_save="classifier"
 target_modules="qkv"
+warmup_epochs=0
+optimizer="adam"
+scheduler="linear"
 
 # Construct the command with variables
 command="python train_lora.py"
-command+=" --lr 5e-3"
+command+=" --lr 2e-4"
 command+=" --train-split $train_split"
 command+=" --val-split $val_split"
 command+=" --model $model_name"
@@ -41,10 +44,11 @@ if [ $use_pretrained == true ]; then
 fi
 # command+=" --output $output_path"
 command+=" --experiment $experiment_name"
+command += " --warmup-epochs $warmup_epochs"
 if [ $use_wandb == true ]; then
   command+=" --log-wandb"
 fi
-command+=" --resume $resume"
+# command+=" --resume $resume"  # uncomment to resume training
 command+=" --device $device"
 command+=" --data-dir $data_path"
 command+=" --batch-size $batch_size"
@@ -55,6 +59,8 @@ command+=" --num-classes $num_classes"
 command+=" --mapping $mapping"
 command+=" --img-size $img_size"
 command+=" --name $name"
+command+=" --opt $optimizer"
+command+=" --sched $scheduler"
 
 # LORA Params
 if [ $lora == true ]; then

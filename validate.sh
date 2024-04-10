@@ -2,9 +2,9 @@
 
 # Define variables with desired values (modify as needed)
 data_dir="/bucket/npss/CottonPestClassification_v3a_npss/"
-split="holdout"
-checkpoint="output/train/vit_base_patch16_224.orig_in21k-timm-050524-OS/model_best.pth.tar"
-results_file="results/vit_base_patch16_224.orig_in21k-timm-050524-OS_holdout_summary.csv"
+split="reporting"
+checkpoint="output/train/vit_base_patch16_224.orig_in21k-timm-050524-OS_FullFinetune/model_best.pth.tar"
+results_file="results/vit_base_patch16_224.orig_in21k-timm-050524-OS_FullFinetune_reporting_summary.csv"
 model_name="vit_base_patch16_224.orig_in21k"
 img_size=224
 num_classes=3

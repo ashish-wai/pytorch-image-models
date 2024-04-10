@@ -689,7 +689,8 @@ def main():
         model = torch.compile(model, backend=args.torchcompile)
     
     if args.lora:
-        load_checkpoint(model, args.resume, strict=False)
+        if args.resume:
+            load_checkpoint(model, args.resume, strict=False)
         if args.lora_config:
             with open(args.lora_config, 'r') as f:
                 lora_user_config = yaml.safe_load(f)

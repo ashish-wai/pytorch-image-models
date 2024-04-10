@@ -13,6 +13,13 @@ print(f"Accelerate version: {accelerate.__version__}")
 print(f"PEFT version: {peft.__version__}")
 from timm.models import create_model, load_checkpoint
 import timm
+import numpy as np
+import random
+seed = 42
+torch.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+np.random.seed(seed)
+random.seed(seed)
 
 # model_checkpoint = "ashishp-wiai/vit-base-patch16-224-in21k-finetuned-CottonPestClassification_v3a_os"
 # model_checkpoint = "ashishp-wiai/vit-base-patch16-224-in21k-finetuned-os300"
@@ -53,9 +60,12 @@ val_transforms = Compose(
 
 
 from loaders.ImageData import ImageDataset
-data_dir = "/bucket/npss/CottonPestClassification_v3a_os_lora/"
+data_dir = "/bucket/npss/CottonPestClassification_v3a_npss/"
+run_name=f"vit_base_patch16_224.orig_in21k-lora-IN21k_NPSS_OS_CheckNew"
+# data_dir = "/bucket/npss/CottonPestClassification_v3a_os_lora/"
 
-train_loader = ImageDataset(data_dir, split='npss', transform=train_transforms)
+# train_loader = ImageDataset(data_dir, split='npss', transform=train_transforms)
+train_loader = ImageDataset(data_dir, split='train', transform=train_transforms)
 val_loader = ImageDataset(data_dir, split='val', transform=val_transforms)
 
 label2id = train_loader.labels2id
@@ -84,10 +94,12 @@ def print_trainable_parameters(model):
 # )
 
 base_model_path = "output/train/vit_base_patch16_224.orig_in21k-timm-050524-OS/model_best.pth.tar"
+load_base_model = False
 
 model = timm.create_model('vit_base_patch16_224.orig_in21k', 
                                 pretrained=True, num_classes=3)
-load_checkpoint(model, base_model_path, strict=False)
+if load_base_model:
+    load_checkpoint(model, base_model_path, strict=False)
 
 # print(model)
 print_trainable_parameters(model)
@@ -101,7 +113,7 @@ config = LoraConfig(
     target_modules=["qkv"],
     lora_dropout=0.1,
     bias="none",
-    modules_to_save=["classifier"],
+    modules_to_save=["head"],
 )
 lora_model = get_peft_model(model, config)
 print_trainable_parameters(lora_model)
@@ -111,15 +123,15 @@ from transformers import TrainingArguments, Trainer
 model_name = model_checkpoint.split("/")[-1]
 batch_size = 128
 args = TrainingArguments(
-    f"output/{model_name.split('/')[-1]}-lora-os100_all",
+    f"output/{model_name.split('/')[-1]}-lora-IN21k_NPSS_OS_CheckNew_1004",
     remove_unused_columns=False,
     learning_rate=5e-3,
     per_device_train_batch_size=batch_size,
-    gradient_accumulation_steps=4,
+    gradient_accumulation_steps=1,
     per_device_eval_batch_size=batch_size,
     fp16=True,
     num_train_epochs=100,
-    logging_steps=10,
+    # logging_steps=10,
     load_best_model_at_end=True,
     metric_for_best_model="accuracy",
     push_to_hub=True,
@@ -129,9 +141,10 @@ args = TrainingArguments(
     save_total_limit=10,
     save_strategy="epoch",
     evaluation_strategy="epoch",
-    run_name=f"{model_name}-lora-os100_corrected_saveAll",
-    save_safetensors=False,
-    hub_strategy="all_checkpoints"
+    run_name=f"{model_name}-lora-IN21k_NPSS_OS_CheckNew_1004",
+    # save_safetensors=False,
+    logging_strategy="epoch",
+    # hub_strategy="all_checkpoints",
 )
 
 
@@ -168,3 +181,6 @@ train_results = trainer.train()
 
 # save best model
 # trainer.save_model(f"output/{model_name}-lora-os100_all_best") 
+
+repo_name = run_name
+trainer.push_to_hub(model_name=repo_name)
